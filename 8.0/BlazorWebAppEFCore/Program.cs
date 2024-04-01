@@ -2,31 +2,78 @@ using BlazorWebAppEFCore.Components;
 using Microsoft.EntityFrameworkCore;
 using BlazorWebAppEFCore.Data;
 using BlazorWebAppEFCore.Grid;
+using OpenTelemetry;
+using OpenTelemetry.Logs;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
+using OpenTelemetry.Instrumentation.AspNetCore;
+using System.Diagnostics.Metrics;
+using System.Diagnostics;
 
-var builder = WebApplication.CreateBuilder(args);
+var serviceName = "MyServiceName";
+var serviceVersion = "1.0.0";
 
-builder.Services.AddRazorComponents()
+var appbuilder = WebApplication.CreateBuilder(args);
+
+DiagnosticsConfig.logger.LogInformation(eventId: 123, "Getting started!");
+
+// Add OpenTelemetry Traces and Metrics to our Service Collection
+appbuilder.Services.AddOpenTelemetry()
+    .WithTracing(tracerProviderBuilder =>
+        tracerProviderBuilder
+            .AddSource(DiagnosticsConfig.ActivitySource.Name)
+            .ConfigureResource(resource => resource
+                .AddService(DiagnosticsConfig.ServiceName))
+            .AddAspNetCoreInstrumentation()
+            //.AddConsoleExporter()
+            .AddOtlpExporter()
+        )
+    .WithMetrics(metricsProviderBuilder =>
+        metricsProviderBuilder
+            .ConfigureResource(resource => resource
+                .AddService(DiagnosticsConfig.ServiceName))
+            .AddAspNetCoreInstrumentation()
+            //.AddConsoleExporter()
+            .AddMeter(DiagnosticsConfig.Meter.Name)
+            .AddOtlpExporter()
+        );
+
+// Add OpenTelemetry Logs to our Service Collection
+/*builder.Logging.AddOpenTelemetry(x =>
+{
+    x.SetResourceBuilder(ResourceBuilder.CreateDefault().AddService("MyService"));
+    x.IncludeFormattedMessage = true;
+    x.IncludeScopes = true;
+    x.ParseStateValues = true;
+    x.AddOtlpExporter();
+});*/
+
+//Console.WriteLine("Done with Otel config ...");
+DiagnosticsConfig.logger.LogInformation(eventId: 123, "Done with Otel config ...");
+
+appbuilder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 // Register factory and configure the options
 #region snippet1
-builder.Services.AddDbContextFactory<ContactContext>(opt =>
+appbuilder.Services.AddDbContextFactory<ContactContext>(opt =>
     opt.UseSqlite($"Data Source={nameof(ContactContext.ContactsDb)}.db"));
 #endregion
 
 // Pager
-builder.Services.AddScoped<IPageHelper, PageHelper>();
+appbuilder.Services.AddScoped<IPageHelper, PageHelper>();
 
 // Filters
-builder.Services.AddScoped<IContactFilters, GridControls>();
+appbuilder.Services.AddScoped<IContactFilters, GridControls>();
 
 // Query adapter (applies filter to contact request)
-builder.Services.AddScoped<GridQueryAdapter>();
+appbuilder.Services.AddScoped<GridQueryAdapter>();
 
 // Service to communicate success on edit between pages
-builder.Services.AddScoped<EditSuccess>();
+appbuilder.Services.AddScoped<EditSuccess>();
 
-var app = builder.Build();
+var app = appbuilder.Build();
 
 // This section sets up and seeds the database. Seeding is NOT normally
 // handled this way in production. The following approach is used in this
@@ -53,3 +100,25 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 app.Run();
+
+public static class DiagnosticsConfig
+{
+    public const string ServiceName = "BlazorWebAppEFCore";
+    public static ActivitySource ActivitySource = new ActivitySource(ServiceName);
+
+    public static Meter Meter = new(ServiceName);
+    public static Counter<long> RequestCounter =
+        Meter.CreateCounter<long>("app.request_counter");
+
+    public static ILogger logger = LoggerFactory.Create(builder =>
+        {
+            builder.AddOpenTelemetry(options =>
+            {
+                //options.AddConsoleExporter();
+                options.AddOtlpExporter();
+                options.SetResourceBuilder(ResourceBuilder.CreateDefault().AddService(
+                    serviceName: ServiceName,
+                    serviceVersion: "0.0.1"));
+            });
+        }).CreateLogger<Program>();
+}
