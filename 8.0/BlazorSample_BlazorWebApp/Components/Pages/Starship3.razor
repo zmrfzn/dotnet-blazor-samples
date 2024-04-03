@@ -5,7 +5,7 @@
 
 <h2>New Ship Entry Form</h2>
 
-<EditForm Model="@Model" OnValidSubmit="@Submit" FormName="Starship3">
+<EditForm Model="Model" OnValidSubmit="Submit" FormName="Starship3">
     <DataAnnotationsValidator />
     <ValidationSummary />
     <div>
@@ -24,10 +24,21 @@
         <label>
             Primary Classification: 
             <InputSelect @bind-Value="Model!.Classification">
-                <option value="">Select classification ...</option>
-                <option value="Exploration">Exploration</option>
-                <option value="Diplomacy">Diplomacy</option>
-                <option value="Defense">Defense</option>
+                <option value="">
+                    Select classification ...
+                </option>
+                <option checked="@(Model!.Classification == "Exploration")" 
+                    value="Exploration">
+                    Exploration
+                </option>
+                <option checked="@(Model!.Classification == "Diplomacy")" 
+                    value="Diplomacy">
+                    Diplomacy
+                </option>
+                <option checked="@(Model!.Classification == "Defense")" 
+                    value="Defense">
+                    Defense
+                </option>
             </InputSelect>
         </label>
     </div>
