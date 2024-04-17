@@ -4,6 +4,12 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Components.Authorization;
 using BlazorWasmAuth.Identity.Models;
 using System.Text;
+using System.Diagnostics;
+using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.Components;
+using OpenTelemetry;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 
 namespace BlazorWasmAuth.Identity
 {
@@ -12,6 +18,17 @@ namespace BlazorWasmAuth.Identity
     /// </summary>
     public class CookieAuthenticationStateProvider : AuthenticationStateProvider, IAccountManagement
     {
+        /*public CookieAuthenticationStateProvider (ILogger<CookieAuthenticationStateProvider> logger)
+        {
+            _logger = logger;
+        }*/
+
+        /*[Inject]
+        public ILogger<CookieAuthenticationStateProvider> Logger { get; set; }
+
+        [Inject]
+        public ILoggerFactory _Factory { get; set; }*/
+
         /// <summary>
         /// Map the JavaScript-formatted properties to C#-formatted classes.
         /// </summary>
@@ -109,14 +126,60 @@ namespace BlazorWasmAuth.Identity
             };
         }
 
+        private static readonly ActivitySource MyLibraryActivitySource = new(
+                "MyCompany.MyProduct.MyLibrary");
+
         /// <summary>
         /// User login.
         /// </summary>
         /// <param name="email">The user's email address.</param>
         /// <param name="password">The user's password.</param>
         /// <returns>The result of the login request serialized to a <see cref="FormResult"/>.</returns>
-        public async Task<FormResult> LoginAsync(string email, string password)
+        public async Task<FormResult> LoginAsync(string email, string password, ILogger Logger)
         {
+            var tracerProvider = Sdk.CreateTracerProviderBuilder()
+                // The following adds subscription to activities from Activity Source
+                // named "MyCompany.MyProduct.MyLibrary" only.
+                .AddSource("MyCompany.MyProduct.MyLibrary")
+
+                // The following adds subscription to activities from all Activity Sources
+                // whose name starts with "AbcCompany.XyzProduct.".
+                .AddSource("AbcCompany.XyzProduct.*")
+                .ConfigureResource(resource => resource.AddAttributes(new List<KeyValuePair<string, object>>
+                    {
+                        new KeyValuePair<string, object>("static-attribute1", "v1"),
+                        new KeyValuePair<string, object>("static-attribute2", "v2"),
+                    }))
+                .ConfigureResource(resource => resource.AddService("MyServiceName"))
+                .AddConsoleExporter()
+                /*.AddOtlpExporter(options =>
+    {
+        options.Endpoint = new Uri("https://otlp.nr-data.net");
+        options.Headers = "api-key=NEW_RELIC_LICENSE_KEY";
+        options.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.HttpProtobuf;
+    })*/
+                .Build();
+
+            // This activity source is enabled.
+            using (var activity = MyLibraryActivitySource.StartActivity("SayHello"))
+            {
+                activity?.SetTag("foo", 1);
+                activity?.SetTag("bar", "Hello, World!");
+            }
+            //using var myActivity = Telemetry.MyActivitySource.StartActivity("LoginAsync");
+            //Telemetry.logger.LogInformation(eventId: 123, "LoginAsync start");
+
+            //var logger = LoggerFactory.CreateLogger("CustomCategory");
+            //var logger = host.Services.GetRequiredService<ILoggerFactory>().CreateLogger<Program>();
+            Logger.LogInformation("Someone has clicked me!");
+            //_httpClient.All.SendAsync("Log", "test");
+
+            //var loggerFromDI = _Factory.CreateLogger("Values"); 
+            //var loggerFromDI = _Factory.CreateLogger<CookieAuthenticationStateProvider>();
+
+            //_logger.LogDebug("From direct dependency injection");
+            //loggerFromDI.LogDebug("From dependency injection factory");
+
             try
             {
                 // login with cookies
@@ -133,11 +196,16 @@ namespace BlazorWasmAuth.Identity
                     // need to refresh auth state
                     NotifyAuthenticationStateChanged(GetAuthenticationStateAsync());
 
+                    //Telemetry.logger.LogInformation(eventId: 123, "LoginAsync done with success");
+
                     // success!
                     return new FormResult { Succeeded = true };
                 }
             }
             catch { }
+
+            //Telemetry.logger.LogInformation(eventId: 123, "LoginAsync done with error");
+            tracerProvider.Dispose();
 
             // unknown error
             return new FormResult
@@ -246,5 +314,26 @@ namespace BlazorWasmAuth.Identity
             public string? Value { get; set; }
             public string? ValueType { get; set; }
         }
+
+        /*public static class Telemetry
+        {
+            public const string ServiceName = "BlazorWebAssemblyStandaloneWithIdentityFrontend";
+
+            // Name it after the service name for your app.
+            // It can come from a config file, constants file, etc.
+            public static readonly ActivitySource MyActivitySource = new(ServiceName);
+
+            public static ILogger logger = LoggerFactory.Create(builder =>
+            {
+                builder.AddOpenTelemetry(options =>
+                {
+                    options.AddConsoleExporter();
+                    //options.AddOtlpExporter();
+                    options.SetResourceBuilder(ResourceBuilder.CreateDefault().AddService(
+                        serviceName: ServiceName,
+                        serviceVersion: "0.0.1"));
+                });
+            }).CreateLogger<Program>();
+        }*/
     }
 }

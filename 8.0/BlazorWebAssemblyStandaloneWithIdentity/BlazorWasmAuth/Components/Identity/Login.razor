@@ -1,6 +1,8 @@
 @page "/login"
 @using BlazorWasmAuth.Identity
+@using Microsoft.Extensions.Logging
 @inject IAccountManagement Acct
+@inject ILogger<Login> Logger
 
 <PageTitle>Login</PageTitle>
 
@@ -23,13 +25,15 @@
                 <label for="email">
                     Email:
                 </label>
-                <input required id="email" name="emailInput" placeholder="Enter your email address" type="email" @bind-value="email" />
+                <input required id="email" name="emailInput" placeholder="Enter your email address" type="email"
+                    @bind-value="email" />
             </div>
             <div>
                 <label for="password">
                     Password:
                 </label>
-                <input required id="password" name="passwordInput" placeholder="Enter your password" type="password" @bind-value="password" />
+                <input required id="password" name="passwordInput" placeholder="Enter your password" type="password"
+                    @bind-value="password" />
             </div>
             <div>
                 <button class="btn btn-primary" @onclick="DoLoginAsync">Login</button>
@@ -49,6 +53,8 @@
         success = errors = false;
         errorList = [];
 
+        Logger.LogInformation("DoLoginAsync");
+
         if (string.IsNullOrWhiteSpace(email))
         {
             errors = true;
@@ -65,7 +71,7 @@
             return;
         }
 
-        var result = await Acct.LoginAsync(email, password);
+        var result = await Acct.LoginAsync(email, password, Logger);
 
         if (result.Succeeded)
         {

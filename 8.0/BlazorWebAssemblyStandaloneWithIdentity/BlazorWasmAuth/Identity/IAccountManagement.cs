@@ -1,4 +1,5 @@
 ﻿using BlazorWasmAuth.Identity.Models;
+using Microsoft.AspNetCore.Components;
 
 namespace BlazorWasmAuth.Identity
 {
@@ -13,7 +14,7 @@ namespace BlazorWasmAuth.Identity
         /// <param name="email">User's email.</param>
         /// <param name="password">User's password.</param>
         /// <returns>The result of the request serialized to <see cref="FormResult"/>.</returns>
-        public Task<FormResult> LoginAsync(string email, string password);
+        public Task<FormResult> LoginAsync(string email, string password, ILogger Logger);
 
         /// <summary>
         /// Log out the logged in user.
