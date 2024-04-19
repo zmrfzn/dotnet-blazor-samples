@@ -183,32 +183,48 @@ app.UseHttpsRedirection();
 
 app.MapGet("/roles", (ClaimsPrincipal user) =>
 {
-
     // Custom Otel span
     using var parentActivity = DiagnosticsConfig.ActivitySource.StartActivity("RolesParentActivity");
 
     // in-process childSpan
+
     using (var childActivity = DiagnosticsConfig.ActivitySource.StartActivity("RolesChildActivity"))
     {
-        childActivity.SetTag("CustomActivitySpan", "simulatedActivty");
+        childActivity?.SetTag("CustomActivitySpan", "simulatedActivty");
+
+
+        // Instantiate random number generator using system-supplied value as seed.
+        var rand = new Random();
+        int waitTime = rand.Next(500, 3000);
+
+        // do some heavy lifting work
+        Thread.Sleep(waitTime);
 
         try
         {
-            Thread.Sleep(3000);
-            Console.WriteLine("ChildActivty simulated wait");
-            throw new Exception("fakeException");
+            if (waitTime >= 1000 &&
+                waitTime < 2000)
+            {
+                throw new Exception("fakeException");
+            }
+            else
+            {
+                string waitMsg = string.Format(@"ChildActivty simulated wait ({0}s)", waitTime);
+                childActivity?.SetTag("simulatedWaitMsg", waitMsg);
+                childActivity?.SetTag("simulatedWaitTime", waitTime);
+                Console.WriteLine(waitMsg);
+                DiagnosticsConfig.logger.LogInformation(eventId: 123, waitMsg);
+            }
         }
         catch (Exception ex)
         {
             // childActivity.RecordException(new Exception("fakeException"));
-            childActivity.SetStatus(ActivityStatusCode.Error, ex.Message);
+            childActivity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             DiagnosticsConfig.logger.LogError("False Error log within ChildSpan");
-
         }
-
-
-
     }
+
+
 
     if (user.Identity is not null && user.Identity.IsAuthenticated)
     {
