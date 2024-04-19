@@ -93,50 +93,7 @@ builder.Services.AddLogging(builder =>
     });
 }
             );
-/*builder.Services.AddLogging(builder => builder
-                .SetMinimumLevel(LogLevel.Debug)
-                .AddFilter("Microsoft", LogLevel.Debug)
-                .AddFilter("System", LogLevel.Debug)
-                .AddOpenTelemetry(builder => builder.AddOtlpExporter(
-    options =>
-    {*/
-//options.AddConsoleExporter();
-//options.AddOtlpExporter();
-/*options.SetResourceBuilder(ResourceBuilder.CreateDefault().AddService(
-    serviceName: ServiceName,
-    serviceVersion: "0.0.1"));*/
-/*options.Endpoint = new Uri("https://otlp.nr-data.net");
-options.Headers = "api-key=NEW_RELIC_LICENSE_KEY";
-}
-              )));*/
-/*builder.Logging.AddOpenTelemetry(builder => builder.AddOtlpExporter(
-    options =>
-    {
-        //options.AddConsoleExporter();
-        //options.AddOtlpExporter();
-        /*options.SetResourceBuilder(ResourceBuilder.CreateDefault().AddService(
-            serviceName: ServiceName,
-            serviceVersion: "0.0.1"));*/
-/*    options.Endpoint = new Uri("https://otlp.nr-data.net");
-    options.Headers = "api-key=NEW_RELIC_LICENSE_KEY";
-}*/
-/*    "logging",
-    options =>
-    {
-        // Note: Options can also be set via code but order is important. In the example here the code will apply after configuration.
-        options.Endpoint = new Uri("https://otlp.nr-data.net");
-        options.Headers = "api-key=NEW_RELIC_LICENSE_KEY";
-    }*/
-//));
 
-//builder.Services.AddTransient<DiagnosticsConfig>();
-//builder.Services.AddSingleton(typeof(ILogger), DiagnosticsConfig.logger);
-/*builder.Services.AddTransient(provider =>
-{
-    var loggerFactory = provider.GetRequiredService<ILoggerFactory>();
-    const string categoryName = "Any";
-    return loggerFactory.CreateLogger(categoryName);
-});*/
 DiagnosticsConfig.logger.LogInformation(eventId: 123, "Done with Otel config ...");
 
 builder.RootComponents.Add<App>("#app");
