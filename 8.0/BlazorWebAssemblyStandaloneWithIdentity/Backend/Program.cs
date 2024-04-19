@@ -28,12 +28,7 @@ builder.Services.AddOpenTelemetry()
                 .AddService(DiagnosticsConfig.ServiceName))
             .AddAspNetCoreInstrumentation()
             //.AddConsoleExporter()
-            .AddOtlpExporter()/*options =>
-    {
-        options.Endpoint = new Uri("https://otlp.nr-data.net");
-        options.Headers = "api-key=NEW_RELIC_LICENSE_KEY";
-        options.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.HttpProtobuf;
-    })*/
+            .AddOtlpExporter()
         )
     .WithMetrics(metricsProviderBuilder =>
         metricsProviderBuilder
@@ -45,34 +40,25 @@ builder.Services.AddOpenTelemetry()
             .AddMeter("System.Net.Http")
             .AddMeter("Microsoft.AspNetCore.Hosting")
             .AddMeter("Microsoft.AspNetCore.Server.Kestrel")
-            .AddOtlpExporter()/*options =>
-    {
-        options.Endpoint = new Uri("https://otlp.nr-data.net");
-        options.Headers = "api-key=NEW_RELIC_LICENSE_KEY";
-        options.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.HttpProtobuf;
-    })*/
+            .AddOtlpExporter()
         );
 
 string ServiceName = "BlazorWebAssemblyStandaloneWithIdentityBackend";
 //builder.Logging.SetMinimumLevel(LogLevel.Debug);
 builder.Services.AddLogging(builder =>
 {
+    // Open Telemetry logging patch
     builder.AddOpenTelemetry(options =>
     {
         //options.AddConsoleExporter();
-        options.AddOtlpExporter(
-    options =>
-    {
-        options.Endpoint = new Uri("https://otlp.nr-data.net");
-        options.Headers = "api-key=NEW_RELIC_LICENSE_KEY";
-        options.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.HttpProtobuf;
-    });
+        options.AddOtlpExporter();
         options.SetResourceBuilder(ResourceBuilder.CreateDefault().AddService(
             serviceName: ServiceName,
             serviceVersion: "0.0.1"));
     });
 }
             );
+
 // Add OpenTelemetry Logs to our Service Collection
 /*builder.Logging.AddOpenTelemetry(x =>
 {
@@ -166,8 +152,6 @@ app.UseCors("wasm");
 app.UseAuthentication();
 app.UseAuthorization();
 
-ActivitySource MyLibraryActivitySource = new(
-                "MyCompany.MyProduct.MyLibrary");
 // Provide an end point to clear the cookie for logout
 //
 // For more information on the logout endpoint and antiforgery, see:
@@ -175,33 +159,9 @@ ActivitySource MyLibraryActivitySource = new(
 app.MapPost("/logout", async (SignInManager<AppUser> signInManager, [FromBody] object empty) => //, [FromHeader] object data) =>
 {
     DiagnosticsConfig.logger.LogInformation(eventId: 123, "Entering logout");
-    //DiagnosticsConfig.logger.LogInformation(eventId: 123, "Entering logout - header: " + data);
-    // todo: look for trace id, if found, comntinue trace with new span
-    var tracerProvider = Sdk.CreateTracerProviderBuilder()
-                // The following adds subscription to activities from Activity Source
-                // named "MyCompany.MyProduct.MyLibrary" only.
-                .AddSource("MyCompany.MyProduct.MyLibrary")
-
-                // The following adds subscription to activities from all Activity Sources
-                // whose name starts with "AbcCompany.XyzProduct.".
-                .AddSource("AbcCompany.XyzProduct.*")
-                .ConfigureResource(resource => resource.AddAttributes(new List<KeyValuePair<string, object>>
-                    {
-                        new KeyValuePair<string, object>("static-attribute1", "v1"),
-                        new KeyValuePair<string, object>("static-attribute2", "v2"),
-                    }))
-                .ConfigureResource(resource => resource.AddService("BlazorWebAssemblyStandaloneWithIdentityBackend"))
-                .AddConsoleExporter()
-                .AddOtlpExporter(options =>
-    {
-        options.Endpoint = new Uri("https://otlp.nr-data.net");
-        options.Headers = "api-key=NEW_RELIC_LICENSE_KEY";
-        //options.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.HttpProtobuf;
-    })
-    .Build();
 
     // This activity source is enabled.
-    using (var activity = MyLibraryActivitySource.StartActivity("Logout"))
+    using (var activity = DiagnosticsConfig.ActivitySource.StartActivity("Logout"))
     {
         activity?.SetTag("foo", 1);
         activity?.SetTag("bar", "Hello, World!");
@@ -241,7 +201,7 @@ app.MapGet("/roles", (ClaimsPrincipal user) =>
         catch (Exception ex)
         {
             // childActivity.RecordException(new Exception("fakeException"));
-            childActivity.SetStatus(ActivityStatusCode.Error,ex.Message);
+            childActivity.SetStatus(ActivityStatusCode.Error, ex.Message);
             DiagnosticsConfig.logger.LogError("False Error log within ChildSpan");
 
         }
@@ -312,9 +272,16 @@ public static class DiagnosticsConfig
             {
                 //options.AddConsoleExporter();
                 options.AddOtlpExporter();
+                // add resource attributes 
                 options.SetResourceBuilder(ResourceBuilder.CreateDefault().AddService(
                     serviceName: ServiceName,
-                    serviceVersion: "0.0.1"));
+                    serviceVersion: "1.0.0")
+                    .AddAttributes(new Dictionary<string, object>
+                    {
+                        ["source"] = "OtelLogger",
+                        ["deployment.environment"] = "staging",
+                        ["team.name"] = "backend"
+                    }));
             });
         }).CreateLogger<Program>();
 }
