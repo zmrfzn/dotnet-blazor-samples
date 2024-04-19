@@ -223,6 +223,33 @@ app.UseHttpsRedirection();
 
 app.MapGet("/roles", (ClaimsPrincipal user) =>
 {
+
+    // Custom Otel span
+    using var parentActivity = DiagnosticsConfig.ActivitySource.StartActivity("RolesParentActivity");
+
+    // in-process childSpan
+    using (var childActivity = DiagnosticsConfig.ActivitySource.StartActivity("RolesChildActivity"))
+    {
+        childActivity.SetTag("CustomActivitySpan", "simulatedActivty");
+
+        try
+        {
+            Thread.Sleep(3000);
+            Console.WriteLine("ChildActivty simulated wait");
+            throw new Exception("fakeException");
+        }
+        catch (Exception ex)
+        {
+            // childActivity.RecordException(new Exception("fakeException"));
+            childActivity.SetStatus(ActivityStatusCode.Error,ex.Message);
+            DiagnosticsConfig.logger.LogError("False Error log within ChildSpan");
+
+        }
+
+
+
+    }
+
     if (user.Identity is not null && user.Identity.IsAuthenticated)
     {
         var identity = (ClaimsIdentity)user.Identity;
@@ -291,3 +318,4 @@ public static class DiagnosticsConfig
             });
         }).CreateLogger<Program>();
 }
+
